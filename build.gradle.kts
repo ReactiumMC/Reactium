@@ -1,0 +1,364 @@
+import java.nio.charset.StandardCharsets
+// Explicit Gradle API imports to fix Kotlin DSL unresolved references
+import org.gradle.external.javadoc.CoreJavadocOptions
+import org.gradle.api.tasks.AbstractCopyTask
+import org.gradle.api.tasks.bundling.AbstractArchiveTask
+import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.api.tasks.javadoc.Javadoc
+import org.gradle.api.file.DuplicatesStrategy
+import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.Copy
+import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.language.base.plugins.LifecycleBasePlugin
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.testing.jacoco.tasks.JacocoReport
+
+plugins {
+    `java-library`
+    `maven-publish`
+    java
+    idea
+    jacoco
+    id("io.github.goooler.shadow") version "8.1.8"
+    id("io.freefair.lombok") version "9.5.0"
+    id("com.gorylenko.gradle-git-properties") version "4.0.1"
+}
+
+group = "org.powernukkitx"
+version = providers.gradleProperty("buildVersion").orElse("nightly-SNAPSHOT").get()
+description = "reactium"
+java.sourceCompatibility = JavaVersion.VERSION_21
+java.targetCompatibility = JavaVersion.VERSION_21
+
+// Constants
+val SHADOW_JAR = "shadowJar"
+val ENCODING = "UTF-8"
+val GH_BUILD = "build"
+val ALPHA_BUILD = "alpha build"
+
+dependencies {
+    api(libs.bundles.netty)
+    api(libs.bundles.logging)
+    api(libs.annotations)
+    api(libs.jsr305)
+    api(libs.gson)
+    api(libs.guava)
+    api(libs.commonsio)
+    api(libs.fastutil)
+    api(libs.snakeyaml)
+    api(libs.stateless4j)
+    api(libs.bedrock.connection)
+
+    implementation(libs.bundles.leveldb)
+    implementation(libs.rng.simple)
+    implementation(libs.rng.sampling)
+    implementation(libs.asm)
+    implementation(libs.jose4j)
+    implementation(libs.joptsimple)
+    implementation(libs.disruptor)
+    implementation(libs.oshi)
+    implementation(libs.fastreflection)
+    implementation(libs.bundles.compress)
+    implementation(libs.bundles.terminal)
+    implementation(libs.okaeri)
+    implementation(libs.pnxgamedata)
+    implementation(libs.commonslang3)
+    implementation(libs.caffeine)
+
+    testImplementation(libs.bundles.test)
+    testImplementation(libs.commonsio)
+
+    testRuntimeOnly(libs.junit.platform.launcher)
+
+    compileOnly(libs.lombok)
+    annotationProcessor(libs.lombok)
+    testCompileOnly(libs.lombok)
+    testAnnotationProcessor(libs.lombok)
+}
+
+configurations.all {
+    resolutionStrategy {
+        cacheDynamicVersionsFor(10, TimeUnit.MINUTES)
+        cacheChangingModulesFor(10, TimeUnit.MINUTES)
+        preferProjectModules()
+    }
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    options.encoding = ENCODING
+    options.annotationProcessorPath = configurations.getByName("annotationProcessor")
+    options.compilerArgs.addAll(listOf("-Xmaxerrs", "99000", "-nowarn"))
+    options.isWarnings = false
+}
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+//Automatically download dependencies source code
+idea {
+    module {
+        isDownloadSources = true
+        isDownloadJavadoc = false
+        excludeDirs.addAll(listOf(
+            file(".gradle"),
+            file("build"),
+            file("out")
+        ))
+    }
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDirs("src/main/resources")
+        }
+    }
+}
+
+tasks.processResources {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
+tasks.processTestResources {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
+tasks.register<DefaultTask>("buildFast") {
+    group = ALPHA_BUILD
+    description = "Compile resources and create the plain jar without tests, docs, or shadow packaging"
+    dependsOn(tasks.compileJava, tasks.processResources, tasks.classes, tasks.jar)
+}
+
+tasks.register<DefaultTask>("buildSkipChores") {
+    group = ALPHA_BUILD
+    description = "Build the runnable jar without tests or documentation"
+    dependsOn(tasks.compileJava, tasks.processResources, tasks.classes, tasks.jar, SHADOW_JAR)
+}
+
+tasks.register<DefaultTask>("buildForGithubAction") {
+    group = GH_BUILD
+    description = "CI packaging build used by GitHub Actions; tests are covered by checkFast"
+    dependsOn(tasks.compileJava, tasks.processResources, tasks.classes, tasks.jar, SHADOW_JAR)
+}
+
+tasks.build {
+    dependsOn(SHADOW_JAR)
+    group = ALPHA_BUILD
+}
+
+tasks.clean {
+    group = ALPHA_BUILD
+    description = "Deletes the build directory and generated files"
+    delete("pnx.yml", "services")
+}
+
+tasks.compileJava {
+    options.encoding = ENCODING
+    options.compilerArgs.addAll(listOf(
+        "-Xpkginfo:always",
+        "-parameters",
+        "-Xlint:-options"
+    ))
+    options.isIncremental = true
+    options.isFork = true
+    options.forkOptions.jvmArgs = listOf("-Xmx2g")
+    options.release.set(21)
+
+    java.sourceCompatibility = JavaVersion.VERSION_21
+    java.targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.compileTestJava {
+    options.encoding = ENCODING
+    options.isIncremental = true
+    options.isFork = true
+    options.forkOptions.jvmArgs = listOf("-Xmx1g")
+}
+
+tasks.test {
+    useJUnitPlatform()
+    jvmArgs(
+        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.io=ALL-UNNAMED",
+        "-Xmx2g", // Limit test JVM memory - smoke tests boot real levels and run terrain generation
+        "-XX:+UseG1GC", // Use G1GC for tests
+        "-XX:MaxGCPauseMillis=200" // Lower GC pause time
+    )
+
+    // Performance for tests
+    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+    forkEvery = 100 // Fork new JVM after 100 tests
+
+    // Test settings
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = false
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = false
+    }
+
+    finalizedBy("jacocoTestReport") // report is always generated after tests run
+}
+
+tasks.withType<Test>().configureEach {
+    onlyIf { !project.hasProperty("skipTests") }
+}
+
+tasks.register<DefaultTask>("testFast") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Run the unit test suite without documentation or packaging tasks"
+    dependsOn(tasks.test)
+}
+
+tasks.register<DefaultTask>("checkFast") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Compile main/test sources and run fast unit checks"
+    dependsOn(tasks.compileJava, tasks.compileTestJava, tasks.test)
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+    reports {
+        csv.required = false
+        xml.required = true
+        html.required = false
+    }
+    dependsOn("test") // tests are required to run before generating the report
+}
+
+tasks.withType<AbstractCopyTask>() {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
+tasks.named<AbstractArchiveTask>("sourcesJar") {
+    dependsOn("generateGitProperties")
+    destinationDirectory.set(layout.buildDirectory)
+}
+
+// Improve build reproducibility for better caching
+tasks.withType<AbstractArchiveTask> {
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+tasks.named<ShadowJar>("shadowJar") {
+    dependsOn("copyDependencies")
+
+    manifest {
+        attributes(
+            "Main-Class" to "org.powernukkitx.JarStart",
+            "Implementation-Version" to project.version,
+            "Implementation-Title" to project.name,
+            "Multi-Release" to "true"
+        )
+    }
+
+    // Required to fix shadowJar log4j2 plugin caching issue
+    transform(com.github.jengelman.gradle.plugins.shadow.transformers.Log4j2PluginsCacheFileTransformer::class.java)
+
+    // Minimize JAR size by excluding unnecessary files
+    exclude(
+        "META-INF/*.SF",
+        "META-INF/*.DSA",
+        "META-INF/*.RSA",
+        "META-INF/DEPENDENCIES",
+        "META-INF/LICENSE*",
+        "META-INF/NOTICE*",
+        "META-INF/maven/**",
+        "about.html"
+    )
+
+    // Merge service files for better compatibility
+    mergeServiceFiles()
+
+    destinationDirectory.set(layout.buildDirectory)
+    archiveFileName.set("${project.description}.jar")
+
+    // Enable ZIP64 format for large archives (>4GB)
+    isZip64 = true
+}
+
+tasks.register<Copy>("copyDependencies") {
+    dependsOn(tasks.jar)
+    group = "other"
+    description = "Copy all dependencies to libs folder"
+    from(configurations.runtimeClasspath)
+    into(layout.buildDirectory.dir("libs"))
+
+    // Enable up-to-date checking for better incremental builds
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+
+    // Performance: Only copy if dependencies changed
+    inputs.files(configurations.runtimeClasspath)
+    outputs.dir(layout.buildDirectory.dir("libs"))
+}
+
+tasks.javadoc {
+    options.encoding = StandardCharsets.UTF_8.name()
+    includes.add("**/**.java")
+    val javadocOptions = options as CoreJavadocOptions
+    javadocOptions.addStringOption(
+        "source",
+        java.sourceCompatibility.toString()
+    )
+    // Suppress some meaningless warnings
+    javadocOptions.addStringOption("Xdoclint:none", "-quiet")
+
+    // Performance: Only generate javadoc for public API
+    javadocOptions.addBooleanOption("public", true)
+
+    // Enable parallel processing
+    isFailOnError = false
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+            artifactId = "server"
+            pom {
+                url.set("https://github.com/PowerNukkitX/PowerNukkitX")
+                licenses {
+                    license {
+                        name.set("MIT License")
+                        url.set("https://opensource.org/licenses/MIT")
+                    }
+                }
+                scm {
+                    connection.set("scm:git:git://github.com/PowerNukkitX/PowerNukkitX.git")
+                    developerConnection.set("scm:git:ssh://github.com/PowerNukkitX/PowerNukkitX.git")
+                    url.set("https://github.com/PowerNukkitX/PowerNukkitX")
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "pnx"
+            url = uri("https://repo.powernukkitx.org/releases")
+            credentials {
+                username = providers.gradleProperty("pnxUsername")
+                    .orElse(providers.environmentVariable("PNX_REPO_USERNAME"))
+                    .orNull
+                password = providers.gradleProperty("pnxPassword")
+                    .orElse(providers.environmentVariable("PNX_REPO_PASSWORD"))
+                    .orNull
+            }
+        }
+    }
+}
+
+// Task optimization - disable unnecessary tasks for faster builds
+tasks.configureEach {
+    // Skip tasks that aren't needed for standard builds
+    if (name.contains("delombok") && !gradle.startParameter.taskNames.contains("javadoc")) {
+        enabled = false
+    }
+}

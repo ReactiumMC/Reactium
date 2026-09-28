@@ -1,0 +1,116 @@
+name: PowerNukkitX Build
+
+on:
+  pull_request:
+    branches:
+      - stable
+      - beta
+      - r/**
+      - b/**
+  push:
+    branches:
+      - stable
+      - beta
+      - r/**
+      - b/**
+
+jobs:
+  changes:
+    name: Detect relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - '.github/**'
+              - 'src/**'
+              - 'gradle/**'
+              - 'build.gradle.kts'
+              - 'settings.gradle.kts'
+
+  build:
+    name: Build PNX Server
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true'
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: actions/setup-java@v6.0.0
+        if: github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true'
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/cache@v6
+        if: github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true'
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - if: github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true'
+        run: chmod +x gradlew
+
+      - if: github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true'
+        run: ./gradlew assemble --no-daemon --parallel --max-workers=2 --stacktrace
+
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'pull_request' && needs.changes.outputs.relevant == 'true' && success()
+        with:
+          name: powernukkitx-jar
+          path: build/libs/*.jar
+
+  check:
+    name: Fast checks (compile, unit tests)
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        if: needs.changes.outputs.relevant == 'true'
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - uses: actions/setup-java@v6.0.0
+        if: needs.changes.outputs.relevant == 'true'
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/cache@v6
+        if: needs.changes.outputs.relevant == 'true'
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - if: needs.changes.outputs.relevant == 'true'
+        run: chmod +x gradlew
+
+      - if: needs.changes.outputs.relevant == 'true'
+        run: ./gradlew checkFast --no-configuration-cache --no-daemon --parallel --max-workers=2 --stacktrace
+
+      - uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
+        if: needs.changes.outputs.relevant == 'true' && success()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: build/reports/jacoco/test/jacocoTestReport.xml
+          disable_search: true
