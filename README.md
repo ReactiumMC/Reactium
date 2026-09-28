@@ -8,7 +8,7 @@
 </p>
 
 # note from schlero
-you may be wondering why tf are all of the commit messages just "oops, wrong move". well, i might've accidentally discarded the commit changes. listen, i know it may be my fault, but some times, i'm not as smart as you might think. anyways, cya in the next update!
+you may be wondering why are all of the commit messages just "oops, wrong move". well, i might've accidentally discarded the commit changes. listen, i know it may be my fault, but some times, i'm not as smart as you might think. anyways, cya in the next update!
 
 Reactium is a Minecraft: Bedrock Edition server software, forked from [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX).
 
