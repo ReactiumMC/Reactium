@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/img/logo.png" alt="Reactium Logo" width="20%"/>
+  <img src=".github/images/logo.png" alt="Reactium Logo" width="20%"/>
   <br>
   <b>Reactium - A Legacy-Inspired Nukkit Fork</b>
   <br><br>
@@ -12,8 +12,8 @@ Reactium is a Minecraft: Bedrock Edition server software, forked from [Cloudburs
 
 ## Philosophy
 
-- **Built on proven ground** — Reactium inherits Nukkit's performance-oriented architecture rather than starting from scratch.
-- **Open and modifiable** — released as open source so the community can extend, fork, and adapt it.
+- **Built on proven ground** - Reactium inherits Nukkit's performance-oriented architecture rather than starting from scratch.
+- **Open and modifiable** - released as open source so the community can extend, fork, and adapt it.
 
 ## 🚧 Current Status
 In development - expect bugs, glitches or missing features.
