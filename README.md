@@ -1,108 +1,40 @@
-![nukkit](.github/images/banner.png)
+<p align="center">
+  <img src=".github/img/logo.png" alt="Reactium Logo" width="20%"/>
+  <br>
+  <b>Reactium - A Legacy-Inspired Nukkit Fork</b>
+  <br><br>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-yellow?style=flat-square" alt="License"></a>
+  <a href="https://github.com/ReactiumMC/Reactium/releases"><img src="https://img.shields.io/badge/version-v0.2.0--beta-blue?style=flat-square" alt="Version"></a>
+</p>
 
-Introduction
--------------
 
-Nukkit is nuclear-powered server software for Minecraft Bedrock Edition.
-It has a few key advantages over other server software:
+Reactium is a Minecraft: Bedrock Edition server software, forked from [Cloudburst Nukkit](https://github.com/CloudburstMC/Nukkit).
 
-* Written in Java, Nukkit is faster and more stable.
-* Having a friendly structure, it's easy to contribute to Nukkit's development and rewrite plugins from other platforms into Nukkit plugins.
+## Philosophy
 
-Nukkit is under improvement yet, we welcome contributions.
+- **Built on proven ground** — Reactium inherits Nukkit's performance-oriented architecture rather than starting from scratch.
+- **Open and modifiable** — released as open source so the community can extend, fork, and adapt it.
 
-Links
---------------------
+## 🚧 Current Status
+In development - expect bugs, glitches or missing features.
 
-* __[Forums](https://cloudburstmc.org/forums/)__
-* __[Discord](https://discord.gg/5PzMkyK)__
-* __[Wiki](https://cloudburstmc.org/wiki/nukkit)__
-* __[Download Nukkit](https://dl.opencollab.dev/nukkit)__
-* __[Download Plugins](https://cloudburstmc.org/resources/categories/nukkit-plugins.1/)__
 
-Compile Nukkit
--------------
-- `git clone https://github.com/CloudburstMC/Nukkit`
-- `cd Nukkit`
-- `./gradlew shadowJar`
+## 📦 Installation
 
-The compiled JAR can be found in the `target/` directory.
-
-Note: You don't need to compile Nukkit yourself if you don't intend to modify the code.
-
-Running
--------------
-Simply run `java -jar nukkit-1.0-SNAPSHOT.jar`.
-
-Plugin API
--------------
-Information on Nukkit's API can be found at the [wiki](https://nukkitx.com/wiki/nukkit/).
-
-Docker
--------------
-
-Running Nukkit in [Docker](https://www.docker.com/) (17.05+ or higher).
-
-Build image from the source,
-
-```
-docker build -t nukkit .
+```bash
+git clone https://github.com/ReactiumMC/Reactium.git
+cd Reactium
+./gradlew shadowJar
 ```
 
-Run once to generate the `nukkit-data` volume, default settings, and choose language,
+## 🤝 Contributing
 
-```
-docker run -it -p 19132:19132/udp -v nukkit-data:/data nukkit
-```
-Docker Compose
--------------
+Contributions are welcome! Please open an issue to discuss significant additions before submitting a PR, so we can keep the scope aligned with the project's goals.
 
-Use [docker-compose](https://docs.docker.com/compose/overview/) to start server on port `19132` and with `nukkit-data` volume,
+## 📜 License
 
-```
-docker-compose up -d
-```
+This project is a fork of Cloudburst Nukkit and retains its original license. See [LICENSE](LICENSE) for details.
 
-Kubernetes & Helm
--------------
+## Credits
 
-Validate the chart:
-
-`helm lint charts/nukkit`
-
-Dry run and print out rendered YAML:
-
-`helm install --dry-run --debug nukkit charts/nukkit`
-
-Install the chart:
-
-`helm install nukkit charts/nukkit`
-
-Or, with some different values:
-
-```
-helm install nukkit \
-  --set image.tag="arm64" \
-  --set service.type="LoadBalancer" \
-    charts/nukkit
-```
-
-Or, the same but with a custom values from a file:
-
-```
-helm install nukkit \
-  -f helm-values.local.yaml \
-    charts/nukkit
-```
-
-Upgrade the chart:
-
-`helm upgrade nukkit charts/nukkit`
-
-Testing after deployment:
-
-`helm test nukkit`
-
-Completely remove the chart:
-
-`helm uninstall nukkit`
+- [Cloudburst Nukkit](https://github.com/CloudburstMC/Nukkit)
